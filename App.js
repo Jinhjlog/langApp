@@ -13,153 +13,169 @@ import styled from "styled-components/native";
 import { Ionicons } from "@expo/vector-icons";
 import icons from "./icons";
 
+const BLACK_COLOR = "#1e272e";
+const GREY = "#485460";
+const GREEN = "#2ecc71";
+const RED = "#e74c3c";
+
 const Container = styled.View`
   flex: 1;
-  justify-content: center;
-  align-items: center;
-  background-color: #00a8ff;
+  background-color: ${BLACK_COLOR};
 `;
 
-const Card = styled(Animated.createAnimatedComponent(View))`
-  background-color: white;
-  width: 250px;
-  height: 250px;
-  justify-content: center;
-  align-items: center;
-  border-radius: 12px;
-  elevation: 50;
-  position: absolute;
-`;
-
-const Btn = styled.TouchableOpacity`
-  margin: 0px 10px;
-`;
-
-const BtnContainer = styled.View`
+const Edge = styled.View`
   flex: 1;
-  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+`;
+const WordContainer = styled(Animated.createAnimatedComponent(View))`
+  width: 90px;
+  height: 90px;
+  justify-content: center;
+  align-items: center;
+  background-color: ${GREY};
+  border-radius: 45px;
 `;
 
-const CardContainer = styled.View`
+const Word = styled.Text`
+  font-size: 38px;
+  font-weight: 500;
+  color: ${(props) => props.color};
+`;
+const Center = styled.View`
   flex: 3;
   justify-content: center;
   align-items: center;
+  z-index: 10;
+`;
+
+const IconCard = styled(Animated.createAnimatedComponent(View))`
+  background-color: white;
+  padding: 5px 10px;
+  border-radius: 10px;
 `;
 
 export default function App() {
+  //Values
+  const opacity = useRef(new Animated.Value(1)).current;
   const scale = useRef(new Animated.Value(1)).current;
-  const position = useRef(new Animated.Value(0)).current;
-  const rotation = position.interpolate({
-    inputRange: [-250, 250],
-    outputRange: ["-15deg", "15deg"],
-    // input이 범위 바깥으로 나갔을 때 어떻게 처리할 지 명시해줄 수 있다.
+  const position = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const scaleOne = position.y.interpolate({
+    inputRange: [-300, -110],
+    outputRange: [2, 1],
     extrapolate: "clamp",
-    /**
-     * extend: 끝이 한계치를 넘어서 계속 진행
-     * identity : 는 끝으로 가면 이상하게 동작함
-     * clamp : 시작과 끝 점이 하나씩 있어서 다다르면 더 이상 진행되지 않음 (회전을 멈춘다.)
-     */
   });
-  // position.addListener(() => console.log(position, rotation));
-  const secondScale = position.interpolate({
-    inputRange: [-300, 0, 300],
-    outputRange: [1, 0.7, 1],
+  const scaleTwo = position.y.interpolate({
+    inputRange: [110, 300],
+    outputRange: [1, 2],
     extrapolate: "clamp",
   });
 
+  // Animations
   const onPressIn = Animated.spring(scale, {
-    toValue: 0.95,
+    toValue: 0.9,
     useNativeDriver: true,
   });
   const onPressOut = Animated.spring(scale, {
     toValue: 1,
     useNativeDriver: true,
   });
-  const goCenter = Animated.spring(position, {
+  const goHome = Animated.spring(position, {
+    toValue: {
+      x: 0,
+      y: 0,
+    },
+    useNativeDriver: true,
+  });
+  const onDropScale = Animated.timing(scale, {
     toValue: 0,
     useNativeDriver: true,
+    duration: 50,
+    easing: Easing.linear,
   });
-
-  const goLeft = Animated.spring(position, {
-    tension: 5,
-    toValue: -500,
-    useNativeDriver: true,
-    restDisplacementThreshold: 100,
-    restSpeedThreshold: 100,
-  });
-  const goRight = Animated.spring(position, {
-    tension: 5,
-    toValue: 500,
+  const onDropOpacity = Animated.timing(opacity, {
+    toValue: 0,
+    duration: 50,
+    easing: Easing.linear,
     useNativeDriver: true,
   });
-
+  // PanResponder
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      // 화면 터치 시작 직후
+
+      // 손가락 움직임 감지
+      onPanResponderMove: (_, { dx, dy }) => {
+        console.log(dy);
+        // 값을 생성
+        // const position
+        // 애니메이션이 가능한 컴포넌트에 값을 연결
+        position.setValue({ x: dx, y: dy });
+        //
+        // 값을 조작
+      },
+
+      // panResponder가 움직이기 시작하면 실행
       onPanResponderGrant: () => {
         onPressIn.start();
       },
-      onPanResponderMove: (_, { dx }) => {
-        position.setValue(dx);
-      },
-      // 손가락을 화면에서 땔 때
-      onPanResponderRelease: (_, { dx }) => {
-        if (dx < -220) {
-          goLeft.start(onDismiss);
-        } else if (dx > 220) {
-          goRight.start(onDismiss);
+
+      // 해당 컴포넌트에서 손가락을 떌 때
+      onPanResponderRelease: (_, { dy }) => {
+        if (dy < -230 || dy > 250) {
+          Animated.sequence([
+            Animated.parallel([onDropOpacity, onDropScale]),
+            Animated.timing(position, {
+              toValue: 0,
+              duration: 50,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+          ]).start(nextIcon);
         } else {
-          console.log("복귀");
-          Animated.parallel([onPressOut, goCenter]).start();
+          Animated.parallel([goHome, onPressOut]).start();
         }
+        // Animated.sequence는 순차적 실행
       },
     })
   ).current;
 
+  //State
   const [index, setIndex] = useState(0);
-  const onDismiss = () => {
-    scale.setValue(1);
-    position.setValue(0);
+  const nextIcon = () => {
     setIndex((prev) => prev + 1);
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
+      Animated.spring(opacity, { toValue: 1, useNativeDriver: true }),
+    ]).start();
   };
-  const closePress = () => {
-    goLeft.start(onDismiss);
-  };
-  const checkPress = () => {
-    goRight.start(onDismiss);
-  };
-
   return (
     <Container>
-      <CardContainer>
-        <Card
-          {...panResponder.panHandlers}
-          style={{ transform: [{ scale: secondScale }] }}
-        >
-          <Ionicons name={icons[index + 1]} color="#192a56" size={94} />
-        </Card>
-        <Card
-          {...panResponder.panHandlers}
+      <Edge>
+        <WordContainer
           style={{
-            transform: [
-              { scale: scale },
-              { translateX: position },
-              { rotateZ: rotation },
-            ],
+            transform: [{ scale: scaleOne }],
           }}
         >
-          <Ionicons name={icons[index]} color="#192a56" size={94} />
-        </Card>
-      </CardContainer>
-      <BtnContainer>
-        <Btn onPress={closePress}>
-          <Ionicons name="close-circle" color="white" size={58} />
-        </Btn>
-        <Btn onPress={checkPress}>
-          <Ionicons name="checkmark-circle" color="white" size={58} />
-        </Btn>
-      </BtnContainer>
+          <Word color={GREEN}>알아</Word>
+        </WordContainer>
+      </Edge>
+      <Center>
+        <IconCard
+          {...panResponder.panHandlers}
+          style={{
+            opacity,
+            transform: [...position.getTranslateTransform(), { scale }],
+          }}
+        >
+          <Ionicons name={icons[index]} color={GREY} size={76} />
+        </IconCard>
+      </Center>
+      <Edge>
+        <WordContainer style={{ transform: [{ scale: scaleTwo }] }}>
+          <Word color={RED}>몰라</Word>
+        </WordContainer>
+      </Edge>
     </Container>
   );
 }
